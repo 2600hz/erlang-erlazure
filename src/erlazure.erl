@@ -380,7 +380,7 @@ handle_call({list_queues, Options}, _From, State) ->
     ReqOptions = [{params, [{comp, list}] ++ Options}],
     ReqContext = new_req_context(?queue_service, ReqOptions, State),
 
-    {?http_ok, Body} = execute_request(ServiceContext, ReqContext),
+    {?http_ok, _RespHeaders, Body} = execute_request(ServiceContext, ReqContext),
     ParseResult = erlazure_queue:parse_queue_list(Body),
     {reply, ParseResult, State};
 
@@ -393,7 +393,7 @@ handle_call({set_queue_acl, Queue, SignedId=#signed_id{}, Options}, _From, State
                   {params, [{comp, acl}] ++ Options}],
     ReqContext = new_req_context(?queue_service, ReqOptions, State),
 
-    {Code, Body} = execute_request(ServiceContext, ReqContext),
+    {Code, _RespHeaders, Body} = execute_request(ServiceContext, ReqContext),
     return_response(Code, Body, State, ?http_no_content, created);
 
                                                 % Get queue acl
@@ -403,7 +403,7 @@ handle_call({get_queue_acl, Queue, Options}, _From, State) ->
                   {params, [{comp, acl}] ++ Options}],
     ReqContext = new_req_context(?queue_service, ReqOptions, State),
 
-    {?http_ok, Body} = execute_request(ServiceContext, ReqContext),
+    {?http_ok, _RespHeaders, Body} = execute_request(ServiceContext, ReqContext),
     ParseResult = erlazure_queue:parse_queue_acl_response(Body),
     {reply, ParseResult, State};
 
@@ -415,7 +415,7 @@ handle_call({create_queue, Queue, Options}, _From, State) ->
                   {params, Options}],
     ReqContext = new_req_context(?queue_service, ReqOptions, State),
 
-    {Code, _Body} = execute_request(ServiceContext, ReqContext),
+    {Code, _RespHeaders, _Body} = execute_request(ServiceContext, ReqContext),
     case Code of
         ?http_created ->
             {reply, {ok, created}, State};
@@ -431,7 +431,7 @@ handle_call({delete_queue, Queue, Options}, _From, State) ->
                   {params, Options}],
     ReqContext = new_req_context(?queue_service, ReqOptions, State),
 
-    {Code, Body} = execute_request(ServiceContext, ReqContext),
+    {Code, _RespHeaders, Body} = execute_request(ServiceContext, ReqContext),
     return_response(Code, Body, State, ?http_no_content, deleted);
 
                                                 % Add message to a queue
@@ -632,14 +632,11 @@ handle_call({get_blob, Container, Blob, Options}, _From, State) ->
                   {params, Options}],
     ReqContext = new_req_context(?blob_service, ReqOptions, State),
 
-    {Code, Body} = execute_request(ServiceContext, ReqContext),
-    case Code of
-        ?http_ok ->
-            {reply, {ok, Body}, State};
-        ?http_partial_content->
-            {reply, {ok, Body}, State};
-        _ -> {reply, {error, Body}, State}
-    end;
+    Reply = case execute_request(ServiceContext, ReqContext) of
+                {error, _} = Error -> Error;
+                {_Code, Body} -> {ok, Body}
+            end,
+    {reply, Reply, State};
 
                                                 % Snapshot blob
 handle_call({snapshot_blob, Container, Blob, Options}, _From, State) ->
@@ -781,13 +778,14 @@ code_change(_OldVer, State, _Extra) ->
 %% Private functions
 %%--------------------------------------------------------------------
 
--spec execute_request(service_context(), req_context()) -> {non_neg_integer(), binary()}.
+date_header(#service_context{service=?table_service}) ->
+    {"Date", httpd_util:rfc1123_date()};
+date_header(#service_context{}) ->
+    {"x-ms-date", httpd_util:rfc1123_date()}.
+
+-spec execute_request(service_context(), req_context()) -> {ok, list(), binary()} | {error, any()}.
 execute_request(ServiceContext = #service_context{}, ReqContext = #req_context{}) ->
-    DateHeader = if (ServiceContext#service_context.service =:= ?table_service) ->
-                         {"Date", httpd_util:rfc1123_date()};
-                    true ->
-                         {"x-ms-date", httpd_util:rfc1123_date()}
-                 end,
+    DateHeader = date_header(ServiceContext),
 
     Headers =  [DateHeader,
                 {"x-ms-version", ServiceContext#service_context.api_version},
@@ -820,13 +818,18 @@ execute_request(ServiceContext = #service_context{}, ReqContext = #req_context{}
                              [{version, "HTTP/1.1"}, {ssl, [{versions, ['tlsv1.2']}]}],
                              [{sync, true}, {body_format, binary}, {headers_as_is, true}]),
     case Response of
-        {ok, {{_, Code, _}, _, Body}}
+        {ok, {{_, Code, _}, ResponseHeaders, Body}}
           when Code >= 200, Code =< 206 ->
-            {Code, Body};
-
+            case proplists:is_defined(return_headers, ReqContext#req_context.params) of
+                true -> {ok, ResponseHeaders, Body};
+                false -> {Code, Body}
+            end;
         {ok, {{_, _, _}, _, Body}} ->
-            get_error_code(Body);
-
+            try get_error_code(Body) of
+                ErrorCodeAtom -> {error, ErrorCodeAtom}
+            catch
+                _ -> {error, Body}
+            end;
         {error, Error} ->
             {error, Error}
     end.
@@ -1024,7 +1027,9 @@ new_req_context(Service, Options, State) ->
                   body = Body,
                   content_length = erlazure_http:get_content_length(Body),
                   parameters = ReqParams,
-                  headers = ReqHeaders }.
+                  headers = ReqHeaders,
+                  params = Params
+                }.
 
 get_req_headers(Params, ParamSpecs) ->
     get_req_params(Params, ParamSpecs, header).
@@ -1041,7 +1046,9 @@ get_req_params(Params, ParamSpecs, Type) ->
                       case orddict:find(ParamName, ParamDefs) of
                           {ok, Value} -> [{Value#param_spec.name, (Value#param_spec.parse_fun)(ParamValue)} | Acc];
                           error -> Acc
-                      end
+
+                      end;
+                 (_Other, Acc) -> Acc
               end,
     lists:foldl(FoldFun, [], Params).
 
