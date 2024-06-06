@@ -1,7 +1,16 @@
 REBAR ?= rebar3
 
+.PHONY: compile
 compile:
 	$(REBAR) compile
+
+.PHONY: dialyze
+dialyze:
+	$(REBAR) dialyzer
+
+.PHONY: clean
+clean:
+	$(REBAR) clean
 
 .PHONY: eunit
 eunit:

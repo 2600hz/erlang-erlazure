@@ -83,11 +83,11 @@
 -type req_param_clientrequestid() :: {?req_param_clientrequestid, string()}.
 
 -type request_common_opt() :: req_param_prefix()
-              | req_param_marker()
-              | req_param_maxresults()
-              | req_param_include()
-              | req_param_timeout()
-              | req_param_clientrequestid().
+                            | req_param_marker()
+                            | req_param_maxresults()
+                            | req_param_include()
+                            | req_param_timeout()
+                            | req_param_clientrequestid().
 
 -type common_opts() :: list(request_common_opt()).
 -export_type([req_param_prefix/0, req_param_marker/0, req_param_maxresults/0, req_param_include/0,
@@ -116,14 +116,14 @@
 -export_type([blob_block_type/0]).
 
 -type enum_common_token() :: {prefix, string()}
-              | {marker, string()}
-              | {max_results, non_neg_integer()}
-              | {delimiter, string()}
-              | {next_marker, string()}.
+                           | {marker, string()}
+                           | {max_results, non_neg_integer()}
+                           | {delimiter, string()}
+                           | {next_marker, string()}.
 -type enum_common_tokens() :: list(enum_common_token()).
 -export_type([enum_common_token/0, enum_common_tokens/0]).
 
--type request_param() :: {atom(), any()}.
+-type request_param() :: {atom() | string(), any()}.
 -type request_param_type() :: uri | header.
 -type request_header() :: {string(), string()}.
 -export_type([request_param/0, request_param_type/0, request_header/0]).
@@ -152,7 +152,7 @@
                       type = undefined :: undefined | request_param_type(),
                       name = "" :: string(),
                       parse_fun = fun(Value) ->
-                                    lists:flatten(io_lib:format("~s", [Value]))
+                                          lists:flatten(io_lib:format("~s", [Value]))
                                   end :: fun((any()) -> string())}).
 -type param_spec() :: #param_spec{}.
 -export_type([param_spec/0]).
