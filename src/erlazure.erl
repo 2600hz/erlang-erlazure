@@ -110,13 +110,19 @@ start(Account, Key) ->
 
 -spec start_link(string(), string()) -> {ok, pid()}.
 start_link(Account, Key) ->
-    gen_server:start_link(?MODULE, {Account, Key}, []).
+    InitOpts = #{account => Account
+                ,key => Key
+                },
+    gen_server:start_link(?MODULE, InitOpts, []).
 
 -type server() :: {local, Name :: atom()} | {global, GlobalName :: term()} | {via, Module :: atom() , ViaName :: term()}.
 
 -spec start_link(server(), string(), string()) -> {ok, pid()}.
 start_link(Name, Account, Key) ->
-    gen_server:start_link(Name, ?MODULE, {Account, Key}, []).
+    InitOpts = #{account => Account
+                ,key => Key
+                },
+    gen_server:start_link(Name, ?MODULE, InitOpts, []).
 
 %%====================================================================
 %% Queue
