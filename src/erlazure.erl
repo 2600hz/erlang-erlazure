@@ -827,7 +827,7 @@ execute_request(ServiceContext = #service_context{}, ReqContext = #req_context{}
     Response = httpc:request(ReqContext#req_context.method,
                              erlazure_http:create_request(ReqContext, [AuthHeader | Headers1]),
                              [{version, "HTTP/1.1"},
-                              {ssl, [{versions, ['tlsv1.2', 'tlsv1.3']},
+                              {ssl, [{versions, proplists:get_value(supported, ssl:versions())},
                                      {'verify', 'verify_peer'},
                                      {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]},
                                      {'cacerts', public_key:cacerts_get()}]}], % recommended since OTP-25
