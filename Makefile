@@ -1,7 +1,12 @@
 REBAR ?= rebar3
 
+.PHONY: compile
 compile:
 	$(REBAR) compile
+
+.PHONY: clean
+clean:
+	$(REBAR) clean
 
 .PHONY: eunit
 eunit:
@@ -10,3 +15,7 @@ eunit:
 .PHONY: ct
 ct:
 	$(REBAR) ct -v --readable=true
+
+.PHONY: dialyze
+dialyze:
+	$(REBAR) dialyzer
