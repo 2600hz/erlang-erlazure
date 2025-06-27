@@ -830,7 +830,9 @@ execute_request(ServiceContext = #service_context{}, ReqContext = #req_context{}
                               {ssl, [{versions, proplists:get_value(supported, ssl:versions())},
                                      {'verify', 'verify_peer'},
                                      {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]},
-                                     {'cacerts', public_key:cacerts_get()}]}], % recommended since OTP-25
+                                     {'cacerts', public_key:cacerts_get()}]},
+                              {timeout, 30000} % default without this is infinity
+                             ], % recommended since OTP-25
                              [{sync, true}, {body_format, binary}, {headers_as_is, true}]),
     case Response of
         {ok, {{_, Code, _}, ResponseHeaders, Body}}
