@@ -322,8 +322,8 @@ put_block_blob(State, Container, Name, Data, Options) when is_list(Options) ->
                       ContentType  -> ReqContext#req_context{ content_type = ContentType }
                   end,
 
-    {Code, Body} = execute_request(ServiceContext, ReqContext1),
-    return_response(Code, Body, ?http_created, created).
+    {Code, Headers, Body} = execute_request(ServiceContext, ReqContext1),
+    return_response(Code, Headers, Body, ?http_created, created).
 
 put_page_blob(State, Container, Name, ContentLength) ->
     put_page_blob(State, Container, Name, ContentLength, []).
@@ -392,7 +392,7 @@ get_blob(State, Container, Blob, Options) when is_list(Options) ->
                   {params, Options}],
     ReqContext = new_req_context(?blob_service, ReqOptions, State),
 
-    {Code, Body} = execute_request(ServiceContext, ReqContext),
+    {Code, _Headers, Body} = execute_request(ServiceContext, ReqContext),
     case Code of
         ?http_ok ->
             {ok, Body};
@@ -556,7 +556,7 @@ delete_table(State, TableName) when is_list(TableName) ->
 %% Private functions
 %%--------------------------------------------------------------------
 
--spec execute_request(service_context(), req_context()) -> {non_neg_integer(), binary()} | {error, any()}.
+-spec execute_request(service_context(), req_context()) -> {non_neg_integer(), list(), binary()} | {error, any()}.
 execute_request(ServiceContext = #service_context{}, ReqContext = #req_context{}) ->
     DateHeader = if (ServiceContext#service_context.service =:= ?table_service) ->
                          {"Date", httpd_util:rfc1123_date()};
@@ -844,6 +844,11 @@ get_req_common_param_specs() ->
      #param_spec{ id = ?req_param_prefix, type = uri, name = "prefix" },
      #param_spec{ id = ?req_param_include, type = uri, name = "include" },
      #param_spec{ id = ?req_param_marker, type = uri, name = "marker" }].
+
+return_response(Code, Headers, Body, Code, _SuccessAtom) ->
+    {Code, Headers, Body};
+return_response(_Code, _Headers, Body, _ExpectedResponseCode, _SuccessAtom) ->
+    {error, Body}.
 
 return_response(Code, Body, ExpectedResponseCode, SuccessAtom) ->
     case Code of
